@@ -1,0 +1,11 @@
+[package]
+name = "batchos-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = { workspace = true }
+riscv = { workspace = true }
+sbi-rt = { workspace = true, features = ["legacy"] }
+lazy_static = { workspace = true, features = ["spin_no_std"] }
+batchos-user ={ path = "../user"}

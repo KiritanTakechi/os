@@ -1,0 +1,8 @@
+[package]
+name = "coopos-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+riscv = { workspace = true }
+sbi-rt = { workspace = true, features = ["legacy"] }
