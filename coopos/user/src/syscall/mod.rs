@@ -28,6 +28,6 @@ pub(crate) fn sys_write(fd: usize, buf: &[u8]) -> isize {
     syscall(Syscall::Write.into(), [fd, buf.as_ptr() as usize, buf.len()])
 }
 
-pub(crate) fn sys_exit(code: usize) -> isize {
-    syscall(Syscall::Exit.into(), [code, 0, 0])
+pub(crate) fn sys_exit(error_code: i32) -> isize {
+    syscall(Syscall::Exit.into(), [error_code as usize, 0, 0])
 }
