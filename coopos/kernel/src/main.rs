@@ -6,6 +6,7 @@ use power::PowerManager;
 mod boot;
 mod config;
 mod console;
+mod loader;
 mod panic;
 mod power;
 mod stack;

@@ -1,5 +1,6 @@
 use crate::config::{KERNEL_STACK_SIZE, USER_STACK_SIZE};
 
+#[derive(Copy, Clone)]
 #[repr(align(4096))]
 pub(crate) struct KernelStack {
     stack: [u8; KERNEL_STACK_SIZE],
@@ -15,6 +16,7 @@ impl KernelStack {
     }
 }
 
+#[derive(Copy, Clone)]
 #[repr(align(4096))]
 pub(crate) struct UserStack {
     stack: [u8; USER_STACK_SIZE],
