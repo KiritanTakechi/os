@@ -21,13 +21,17 @@ pub(crate) fn syscall(id: usize, args: [usize; 3]) -> isize {
 enum Syscall {
     Write = 64,
     Exit = 93,
+    SchedYield = 124,
 }
 
-
-pub(crate) fn sys_write(fd: usize, buf: &[u8]) -> isize {
-    syscall(Syscall::Write.into(), [fd, buf.as_ptr() as usize, buf.len()])
+pub(crate) fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+    syscall(Syscall::Write.into(), [fd, buf as usize, len])
 }
 
-pub(crate) fn sys_exit(error_code: i32) -> isize {
+pub(crate) fn sys_exit(error_code: isize) -> isize {
     syscall(Syscall::Exit.into(), [error_code as usize, 0, 0])
+}
+
+pub(crate) fn sys_sched_yield() -> isize {
+    syscall(Syscall::SchedYield.into(), [0, 0, 0])
 }

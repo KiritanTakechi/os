@@ -25,10 +25,12 @@ SECTIONS
     }
     . = ALIGN(4K);
 
+    sbss = .;
     .bss : {
         *(.bss .bss.*)
     }
     . = ALIGN(4K);
+    ebss = .;
 
     /DISCARD/ : {
         *(.comment)

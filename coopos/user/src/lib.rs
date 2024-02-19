@@ -16,13 +16,17 @@ fn _start() -> ! {
 }
 
 extern "C" {
-    fn main() -> i32;
+    fn main() -> isize;
 }
 
-pub(crate) fn write(fd: usize, buf: &[u8]) -> isize {
-    sys_write(fd, buf)
+pub fn write(fd: usize, buf: &[u8]) -> isize {
+    sys_write(fd, buf.as_ptr(), buf.len())
 }
 
-pub(crate) fn exit(error_code: i32) -> isize {
+pub fn exit(error_code: isize) -> isize {
     sys_exit(error_code)
+}
+
+pub fn sched_yield() -> isize {
+    syscall::sys_sched_yield()
 }

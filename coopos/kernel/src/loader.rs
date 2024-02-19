@@ -1,23 +1,16 @@
 use core::{arch::asm, ptr::copy_nonoverlapping, slice::from_raw_parts};
 
-use crate::config::{APP_BASE_ADDRESS, APP_SIZE_LIMIT};
+use crate::{config::{APP_BASE_ADDRESS, APP_SIZE_LIMIT}, ffi::_num_app};
 
-extern "C" {
-    static _num_app: usize;
+pub(crate) fn get_app_num() -> usize {
+    unsafe { (_num_app as usize as *const usize).read_volatile() }
 }
 
-fn get_app_num() -> usize {
-    unsafe { _num_app }
-}
-
-fn get_base_i(app_id: usize) -> usize {
+pub(crate) fn get_base_i(app_id: usize) -> usize {
     APP_BASE_ADDRESS + app_id * APP_SIZE_LIMIT
 }
 
 fn load_app() {
-    extern "C" {
-        fn _num_app();
-    }
     let num_app_ptr = _num_app as usize as *const usize;
     let num_app = get_app_num();
 
