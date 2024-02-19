@@ -23,5 +23,11 @@ mod sync;
 #[no_mangle]
 pub(crate) extern "C" fn start_kernel() -> ! {
     Init::clear_bss();
-    PowerManager::shutdown(false)
+    println!("[kernel] Hello, world!");
+    trap::init();
+    println!("Loading apps... ");
+    loader::load_apps();
+    println!("Done!");
+    task::manager::run_first_task();
+    panic!("Unreachable in rust_main!");
 }

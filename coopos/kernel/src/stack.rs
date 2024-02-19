@@ -16,8 +16,8 @@ pub(crate) static KERNEL_STACK: [KernelStack; MAX_APP_NUM] = [KernelStack {
 }; MAX_APP_NUM];
 
 impl KernelStack {
-    pub(crate) fn get_top_ptr(&self) -> *const u8 {
-        self.data.as_ptr().wrapping_add(KERNEL_STACK_SIZE)
+    pub(crate) fn get_top_ptr(&self) -> usize {
+        self.data.as_ptr().wrapping_add(KERNEL_STACK_SIZE) as usize
     }
 
     pub(crate) fn push_context(&self, context: TrapContext) -> usize {
@@ -45,7 +45,7 @@ pub(crate) static USER_STACK: [UserStack; MAX_APP_NUM] = [UserStack {
 }; MAX_APP_NUM];
 
 impl UserStack {
-    pub(crate) fn top_ptr(&self) -> *const u8 {
-        self.data.as_ptr().wrapping_add(USER_STACK_SIZE)
+    pub(crate) fn top_ptr(&self) -> usize {
+        self.data.as_ptr().wrapping_add(USER_STACK_SIZE) as usize
     }
 }

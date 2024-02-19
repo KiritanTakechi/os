@@ -8,7 +8,7 @@ for file in user/src/bin/*; do
 
     new_address=$(printf "0x%x" $((0x80400000 + 0x20000 * file_counter)))
 
-    sed -i "s/USER_BASE_ADDRESS = 0x[0-9a-fA-F]*;/USER_BASE_ADDRESS = $new_address;/g" user/script/linker.ld
+    sed -i "s/BASE_ADDRESS = 0x[0-9a-fA-F]*;/BASE_ADDRESS = $new_address;/g" user/script/linker.ld
 
     cargo build --release --bin "$binname"
 
@@ -17,4 +17,4 @@ for file in user/src/bin/*; do
     file_counter=$((file_counter + 1))
 done
 
-sed -i 's/USER_BASE_ADDRESS = 0x[0-9a-fA-F]*;/USER_BASE_ADDRESS = 0x80400000;/g' user/script/linker.ld
+sed -i 's/BASE_ADDRESS = 0x[0-9a-fA-F]*;/BASE_ADDRESS = 0x80400000;/g' user/script/linker.ld

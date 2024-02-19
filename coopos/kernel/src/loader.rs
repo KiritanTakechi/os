@@ -10,7 +10,7 @@ pub(crate) fn get_base_i(app_id: usize) -> usize {
     APP_BASE_ADDRESS + app_id * APP_SIZE_LIMIT
 }
 
-fn load_app() {
+pub(crate) fn load_apps() {
     let num_app_ptr = _num_app as usize as *const usize;
     let num_app = get_app_num();
 

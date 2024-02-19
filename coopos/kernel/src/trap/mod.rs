@@ -6,7 +6,7 @@ use riscv::register::{
     stvec::{self, TrapMode},
 };
 
-use crate::syscall::syscall;
+use crate::{ffi::__alltraps, syscall::syscall};
 
 use self::context::TrapContext;
 
@@ -15,16 +15,12 @@ pub(crate) mod context;
 global_asm!(include_str!("trap.S"));
 
 pub(crate) fn init() {
-    extern "C" {
-        fn __alltraps();
-    }
     unsafe {
         stvec::write(__alltraps as usize, TrapMode::Direct);
     }
 }
 
 #[no_mangle]
-#[repr(align(2))]
 pub(crate) fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
     let scause = scause::read();
     let stval = stval::read();

@@ -1,12 +1,12 @@
+
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
-USER_BASE_ADDRESS = 0x80400000;
+BASE_ADDRESS = 0x80400000;
 
 SECTIONS
 {
-    . = USER_BASE_ADDRESS;
-
+    . = BASE_ADDRESS;
     .text : {
         *(.text.entry)
         *(.text .text.*)
@@ -25,13 +25,8 @@ SECTIONS
         *(.sbss .sbss.*)
         end_bss = .;
     }
-
     /DISCARD/ : {
-        *(.comment)
-        *(.note*)
         *(.eh_frame)
-        *(.eh_frame_hdr)
-        *(.rela*)
-        *(.symtab)
+        *(.debug*)
     }
 }

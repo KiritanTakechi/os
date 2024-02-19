@@ -14,6 +14,14 @@ impl TaskControl {
         }
     }
 
+    pub(crate) fn get_context(&self) -> TaskContext {
+        self.context
+    }
+
+    pub(crate) fn get_status(&self) -> TaskStatus {
+        self.status
+    }
+
     pub(crate) fn set_context(&mut self, context: TaskContext) {
         self.context = context;
     }

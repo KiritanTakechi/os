@@ -1,5 +1,6 @@
 #![no_std]
-#![no_main]
+#![feature(linkage)]
+#![feature(panic_info_message)]
 
 use syscall::{sys_exit, sys_write};
 
@@ -10,13 +11,27 @@ mod panic;
 mod syscall;
 
 #[no_mangle]
+#[link_section = ".text.entry"]
 fn _start() -> ! {
-    exit(unsafe { main() });
+    clear_bss();
+    exit(main());
     unreachable!()
 }
 
-extern "C" {
-    fn main() -> isize;
+#[linkage = "weak"]
+#[no_mangle]
+fn main() -> isize {
+    panic!("Cannot find main!");
+}
+
+fn clear_bss() {
+    extern "C" {
+        fn start_bss();
+        fn end_bss();
+    }
+    (start_bss as usize..end_bss as usize).for_each(|addr| unsafe {
+        (addr as *mut u8).write_volatile(0);
+    });
 }
 
 pub fn write(fd: usize, buf: &[u8]) -> isize {
