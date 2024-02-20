@@ -1,0 +1,10 @@
+[package]
+name = "timesharing-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+riscv = { workspace = true }
+lazy_static = { workspace = true }
+sbi-rt = { workspace = true, features = ["legacy"] }
+num_enum = { workspace = true }

@@ -1,0 +1,11 @@
+[workspace]
+default-members = ["user", "kernel"]
+members = ["user", "kernel"]
+resolver = "2"
+
+[workspace.dependencies]
+log = "0.4.20"
+riscv = "0.11.0"
+sbi-rt = "0.0.3"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+num_enum = { version = "0.7.2", default-features = false }
