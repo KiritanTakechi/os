@@ -1,0 +1,8 @@
+[package]
+name = "addressos-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sbi-rt = { workspace = true }
+log ={ workspace = true }
