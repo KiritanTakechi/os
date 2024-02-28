@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sbi-rt = { workspace = true }
+sbi-rt = { workspace = true , features = ["legacy"] }
 log ={ workspace = true }
+buddy_system_allocator = { workspace = true }
+bitflags = { workspace = true }

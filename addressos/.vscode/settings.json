@@ -8,5 +8,6 @@
     "rust-analyzer.linkedProjects": [
         "./kernel/Cargo.toml",
         "./user/Cargo.toml",
-    ]
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
 }
