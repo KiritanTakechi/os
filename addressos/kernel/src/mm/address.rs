@@ -1,3 +1,5 @@
+use core::ops::Add;
+
 use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
 
 const PA_WIDTH_SV39: usize = 56;
@@ -5,16 +7,16 @@ const VA_WIDTH_SV39: usize = 39;
 const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub(crate) struct PhysAddr(pub(crate) usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub(crate) struct VirtAddr(pub(crate) usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct PhysPageNum(pub usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct VirtPageNum(pub usize);
 
 impl From<usize> for PhysAddr {
@@ -92,6 +94,34 @@ impl From<VirtAddr> for VirtPageNum {
 impl From<VirtPageNum> for VirtAddr {
     fn from(addr: VirtPageNum) -> Self {
         Self(addr.0 << PAGE_SIZE_BITS)
+    }
+}
+
+impl From<VirtAddr> for PhysAddr {
+    fn from(addr: VirtAddr) -> Self {
+        unimplemented!("VirtAddr -> PhysAddr")
+    }
+}
+
+impl From<PhysAddr> for VirtAddr {
+    fn from(addr: PhysAddr) -> Self {
+        unimplemented!("PhysAddr -> VirtAddr")
+    }
+}
+
+impl Add<usize> for PhysPageNum {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl Add<usize> for VirtPageNum {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        Self(self.0 + rhs)
     }
 }
 

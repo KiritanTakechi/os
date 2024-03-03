@@ -1,24 +1,23 @@
-use core::cell::RefCell;
+use core::cell::{Ref, RefCell, RefMut};
 
-pub(crate) struct UpSafeCell<T> {
+pub struct UpSafeCell<T> {
     inner: RefCell<T>,
 }
 
 unsafe impl<T> Sync for UpSafeCell<T> {}
-unsafe impl<T> Send for UpSafeCell<T> {}
 
 impl<T> UpSafeCell<T> {
-    fn new(value: T) -> Self {
+    pub(crate) fn new(value: T) -> Self {
         UpSafeCell {
             inner: RefCell::new(value),
         }
     }
 
-    fn borrow(&self) -> core::cell::Ref<T> {
+    pub(crate) fn borrow(&self) -> Ref<'_, T> {
         self.inner.borrow()
     }
 
-    fn borrow_mut(&self) -> core::cell::RefMut<T> {
+    pub(crate) fn borrow_mut(&self) -> RefMut<'_, T> {
         self.inner.borrow_mut()
     }
 }

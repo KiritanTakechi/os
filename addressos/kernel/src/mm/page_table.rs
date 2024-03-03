@@ -1,10 +1,11 @@
 use core::marker::PhantomData;
 
 use alloc::vec::Vec;
+use pod::Pod;
 
 use super::{address::PhysAddr, frame::VirtMemFrame};
 
-pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized {
+pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod {
     fn new() -> Self;
 
     fn set_valid(&mut self, valid: bool) -> Self;
@@ -32,7 +33,7 @@ pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized {
     fn is_dirty(&self) -> bool;
 }
 
-pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized {
+pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod {
     type F: PageTableFlagsTrait;
 }
 
@@ -66,3 +67,4 @@ impl<T: PageTableEntryTrait> PageTable<T> {
         }
     }
 }
+

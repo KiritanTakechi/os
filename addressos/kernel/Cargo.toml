@@ -8,3 +8,7 @@ sbi-rt = { workspace = true , features = ["legacy"] }
 log ={ workspace = true }
 buddy_system_allocator = { workspace = true }
 bitflags = { workspace = true }
+pod = { workspace = true }
+lazy_static = { workspace = true }
+once_cell ={ workspace = true }
+spin = { workspace = true }
