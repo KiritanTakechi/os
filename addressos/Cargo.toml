@@ -10,7 +10,9 @@ sbi-rt = "0.0.3"
 once_cell = { version = "1.19.0", default-features = false }
 num_enum = { version = "0.7.2", default-features = false }
 buddy_system_allocator = "0.9.1"
-bitflags = "2.4.2"
+bitflags = { version = "2.4.2", features = ["bytemuck"] }
 pod = { git = "https://github.com/asterinas/pod" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 spin = "0.9.4"
+bytemuck = { version = "1.14.3", features = ["derive"] }
+bitfield-struct = "0.6"

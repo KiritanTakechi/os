@@ -1,12 +1,12 @@
 use self::{frame_allocator::frame_allocator_test, heap_allocator::heap_test};
 
-mod address;
+pub(crate) mod address;
 mod frame;
 mod frame_allocator;
 mod heap_allocator;
 mod memory_set;
 mod option;
-mod page_table;
+pub(crate) mod page_table;
 
 pub fn init() {
     heap_allocator::init_heap();

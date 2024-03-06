@@ -1,11 +1,16 @@
 use core::marker::PhantomData;
 
 use alloc::vec::Vec;
-use pod::Pod;
+use bytemuck::{Pod, Zeroable};
 
-use super::{address::PhysAddr, frame::VirtMemFrame};
+use crate::mm::frame_allocator;
 
-pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod {
+use super::{
+    address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
+    frame::VirtMemFrame,
+};
+
+pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod + Zeroable {
     fn new() -> Self;
 
     fn set_valid(&mut self, valid: bool) -> Self;
@@ -33,8 +38,16 @@ pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod {
     fn is_dirty(&self) -> bool;
 }
 
-pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod {
+pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod + Zeroable {
     type F: PageTableFlagsTrait;
+
+    fn phys_page_num(&self) -> PhysPageNum;
+
+    fn flags(&self) -> Self::F;
+
+    fn update(&mut self, phys_page_num: PhysPageNum, flags: Self::F);
+
+    fn clear(&mut self);
 }
 
 #[derive(Debug)]
@@ -66,5 +79,30 @@ impl<T: PageTableEntryTrait> PageTable<T> {
             phantom: PhantomData,
         }
     }
-}
 
+    fn page_walk(&mut self, virt_page_num: VirtPageNum, create: bool) -> Option<&mut T> {
+        let idxs = virt_page_num.page_dir_idxs();
+        let mut page_table = self.root_paddr;
+        let mut page_table_entry = None;
+
+        for i in 0..3 {
+            let idx = idxs[i];
+            let page_table_entry_paddr = page_table + idx * core::mem::size_of::<T>();
+            let page_table_entry_vaddr = VirtAddr::from(page_table_entry_paddr);
+            let page_table_entry = unsafe { &mut *(page_table_entry_vaddr.0 as *mut T) };
+
+            if page_table_entry.flags().is_valid() {
+                page_table = page_table_entry.phys_page_num().into();
+            } else if create {
+                let frame = frame_allocator::alloc().unwrap();
+                page_table_entry.update(PhysPageNum::from(frame.start_phys_addr()), T::F::new());
+                page_table = frame.start_phys_addr();
+                self.tables.push(frame);
+            } else {
+                return None;
+            }
+        }
+
+        page_table_entry
+    }
+}

@@ -5,6 +5,7 @@
 #![feature(const_mut_refs)]
 #![feature(ptr_sub_ptr)]
 #![feature(const_ptr_sub_ptr)]
+#![feature(trivial_bounds)]
 
 extern crate alloc;
 

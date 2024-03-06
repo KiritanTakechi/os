@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
-use alloc::{sync::Arc, vec::Vec};
-use pod::Pod;
+use alloc::sync::Arc;
+use bytemuck::{bytes_of, Pod, Zeroable};
 
 use crate::config::PAGE_SIZE;
 
@@ -193,12 +193,12 @@ impl<'a> VirtMemWriter<'a> {
         copy_len
     }
 
-    pub fn fill<T: Pod>(&mut self, value: T) {
-        assert!(self.avail() / value.as_bytes().len() > 0);
-        assert!(self.avail() % value.as_bytes().len() == 0);
+    pub fn fill<T: Pod + Zeroable>(&mut self, value: T) {
+        assert!(self.avail() / bytes_of(&value).len() > 0);
+        assert!(self.avail() % bytes_of(&value).len() == 0);
 
         while self.avail() > 0 {
-            self.write(&mut value.as_bytes().into());
+            self.write(&mut bytes_of(&value).into());
         }
     }
 }

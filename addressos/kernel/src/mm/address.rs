@@ -1,5 +1,7 @@
 use core::ops::Add;
 
+use bytemuck::{Pod, Zeroable};
+
 use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
 
 const PA_WIDTH_SV39: usize = 56;
@@ -7,16 +9,20 @@ const VA_WIDTH_SV39: usize = 39;
 const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Pod, Zeroable, Debug)]
+#[repr(C)]
 pub(crate) struct PhysAddr(pub(crate) usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Pod, Zeroable, Debug)]
+#[repr(C)]
 pub(crate) struct VirtAddr(pub(crate) usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Pod, Zeroable, Debug)]
+#[repr(C)]
 pub struct PhysPageNum(pub usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Pod, Zeroable, Debug)]
+#[repr(C)]
 pub struct VirtPageNum(pub usize);
 
 impl From<usize> for PhysAddr {
@@ -160,6 +166,22 @@ impl VirtAddr {
     }
     pub fn is_aligned(&self) -> bool {
         self.page_offset() == 0
+    }
+}
+
+impl PhysPageNum {}
+
+impl VirtPageNum {
+    pub fn page_dir_idxs(&self) -> [usize; 3] {
+        let mut virt_page_num = self.0;
+        let mut idxs = [0usize; 3];
+
+        (0..3).rev().for_each(|i| {
+            idxs[i] = virt_page_num & ((1 << 9) - 1);
+            virt_page_num >>= 9;
+        });
+
+        idxs
     }
 }
 
