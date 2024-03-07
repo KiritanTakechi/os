@@ -3,9 +3,12 @@ use core::arch::asm;
 use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 
-use crate::mm::{
-    address::{PhysAddr, PhysPageNum},
-    page_table::{PageTableEntryTrait, PageTableFlagsTrait},
+use crate::{
+    config::ENTRY_COUNT,
+    mm::{
+        address::{PhysAddr, PhysPageNum, VirtAddr},
+        page_table::{PageTableEntryTrait, PageTableFlagsTrait},
+    },
 };
 
 bitflags! {
@@ -90,7 +93,7 @@ impl PageTableFlagsTrait for PageTableFlags {
     }
 }
 
-pub fn tlb_flush(addr: PhysAddr) {
+pub fn tlb_flush(addr: VirtAddr) {
     unsafe {
         asm!("sfence.vma {}, 0", in(reg) usize::from(addr), options(nostack));
     }
@@ -102,6 +105,11 @@ struct PageTableEntry(usize);
 
 impl PageTableEntryTrait for PageTableEntry {
     type F = PageTableFlags;
+
+    fn page_index(addr: VirtAddr, level: usize) -> usize {
+        debug_assert!((1..=5).contains(&level));
+        usize::from(addr) >> (12 + 9 * (level - 1)) & (ENTRY_COUNT - 1)
+    }
 
     fn phys_page_num(&self) -> PhysPageNum {
         PhysPageNum(self.0 >> 10)

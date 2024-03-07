@@ -1,9 +1,9 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, mem::size_of};
 
 use alloc::vec::Vec;
 use bytemuck::{Pod, Zeroable};
 
-use crate::mm::frame_allocator;
+use crate::{arch::mm::tlb_flush, config::PAGE_SIZE, mm::frame_allocator};
 
 use super::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -40,6 +40,8 @@ pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod + Zeroable {
 
 pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod + Zeroable {
     type F: PageTableFlagsTrait;
+
+    fn page_index(addr: VirtAddr, level: usize) -> usize;
 
     fn phys_page_num(&self) -> PhysPageNum;
 
@@ -80,29 +82,70 @@ impl<T: PageTableEntryTrait> PageTable<T> {
         }
     }
 
-    fn page_walk(&mut self, virt_page_num: VirtPageNum, create: bool) -> Option<&mut T> {
-        let idxs = virt_page_num.page_dir_idxs();
-        let mut page_table = self.root_paddr;
-        let mut page_table_entry = None;
+    fn page_walk(&mut self, addr: VirtAddr, create: bool) -> Option<&mut T> {
+        let mut count = 3;
 
-        for i in 0..3 {
-            let idx = idxs[i];
-            let page_table_entry_paddr = page_table + idx * core::mem::size_of::<T>();
-            let page_table_entry_vaddr = VirtAddr::from(page_table_entry_paddr);
-            let page_table_entry = unsafe { &mut *(page_table_entry_vaddr.0 as *mut T) };
+        let mut current_entry = unsafe {
+            &mut *((usize::from(self.root_paddr) + size_of::<T>() * T::page_index(addr, count))
+                as *mut T)
+        };
 
-            if page_table_entry.flags().is_valid() {
-                page_table = page_table_entry.phys_page_num().into();
-            } else if create {
+        while count > 1 {
+            if !current_entry.flags().is_valid() {
+                if !create {
+                    return None;
+                }
+
                 let frame = frame_allocator::alloc().unwrap();
-                page_table_entry.update(PhysPageNum::from(frame.start_phys_addr()), T::F::new());
-                page_table = frame.start_phys_addr();
+
+                let flags = T::F::new()
+                    .set_valid(true)
+                    .set_accessible_by_user(true)
+                    .set_readable(true)
+                    .set_writable(true);
+                current_entry.update(frame.start_phys_addr().into(), flags);
                 self.tables.push(frame);
-            } else {
-                return None;
             }
+
+            // if current_entry.flags().is_huge() {
+            //     break;
+            // }
+
+            count -= 1;
+            debug_assert!(size_of::<T>() * (T::page_index(addr, count) + 1) <= PAGE_SIZE);
+
+            current_entry = unsafe {
+                &mut *((usize::from(self.root_paddr) + size_of::<T>() * T::page_index(addr, count))
+                    as *mut T)
+            };
+        }
+        Some(current_entry)
+    }
+
+    fn map(&mut self, addr: VirtAddr, target: PhysAddr, flags: T::F) -> Result<(), PageTableError> {
+        let entry = self
+            .page_walk(addr, true)
+            .ok_or(PageTableError::InvalidVaddr)?;
+
+        if entry.flags().is_valid() {
+            return Err(PageTableError::InvalidModification);
         }
 
-        page_table_entry
+        entry.update(target.floor(), flags);
+        Ok(())
+    }
+
+    fn unmap(&mut self, addr: VirtAddr) -> Result<(), PageTableError> {
+        let entry = self
+            .page_walk(addr, false)
+            .ok_or(PageTableError::InvalidVaddr)?;
+
+        if !entry.flags().is_valid() {
+            return Err(PageTableError::InvalidModification);
+        }
+
+        entry.clear();
+        tlb_flush(addr);
+        Ok(())
     }
 }
