@@ -57,6 +57,16 @@ impl VirtMemFrame {
         let addr = self.start_phys_addr();
         addr.0 as *mut u8
     }
+
+    pub fn copy_from_frame(&self, src: &Self) {
+        if Arc::ptr_eq(&self.frame_index, &src.frame_index) {
+            return;
+        }
+
+        unsafe {
+            core::ptr::copy_nonoverlapping(src.as_ptr(), self.as_mut_ptr(), PAGE_SIZE);
+        }
+    }
 }
 
 impl<'a> VirtMemFrame {

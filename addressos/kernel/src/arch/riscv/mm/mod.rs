@@ -2,6 +2,7 @@ use core::arch::asm;
 
 use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
+use riscv::register::satp;
 
 use crate::{
     config::ENTRY_COUNT,
@@ -95,13 +96,21 @@ impl PageTableFlagsTrait for PageTableFlags {
 
 pub fn tlb_flush(addr: VirtAddr) {
     unsafe {
-        asm!("sfence.vma {}, 0", in(reg) usize::from(addr), options(nostack));
+        asm!("sfence.vma {}", in(reg) usize::from(addr), options(nostack));
+    }
+}
+
+pub fn mm_csr(root_addr:PhysAddr){
+    let stap_bit = 8usize << 60 | root_addr.floor().0;
+    unsafe {
+        satp::write(stap_bit);
+        asm!("sfence.vma", options(nostack));
     }
 }
 
 #[derive(Clone, Copy, Pod, Zeroable, Debug)]
 #[repr(C)]
-struct PageTableEntry(usize);
+pub struct PageTableEntry(usize);
 
 impl PageTableEntryTrait for PageTableEntry {
     type F = PageTableFlags;
@@ -119,6 +128,10 @@ impl PageTableEntryTrait for PageTableEntry {
         PageTableFlags::from_bits_truncate(self.0 as u8)
     }
 
+    fn is_used(&self) -> bool {
+        self.0 != 0
+    }
+
     fn update(&mut self, phys_page_num: PhysPageNum, flags: Self::F) {
         self.0 = usize::from(phys_page_num) << 10 | flags.bits() as usize;
     }
@@ -127,3 +140,4 @@ impl PageTableEntryTrait for PageTableEntry {
         self.0 = 0;
     }
 }
+

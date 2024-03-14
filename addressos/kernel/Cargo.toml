@@ -4,11 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sbi-rt = { workspace = true , features = ["legacy"] }
-log ={ workspace = true }
+sbi-rt = { workspace = true, features = ["legacy"] }
+log = { workspace = true }
 buddy_system_allocator = { workspace = true }
 bitflags = { workspace = true }
 lazy_static = { workspace = true }
-once_cell ={ workspace = true }
+once_cell = { workspace = true }
 spin = { workspace = true }
 bytemuck = { workspace = true }
+riscv = { workspace = true }

@@ -1,16 +1,16 @@
-use core::{marker::PhantomData, mem::size_of};
+use core::{fmt::Debug, marker::PhantomData, mem::size_of};
 
-use alloc::vec::Vec;
+use alloc::{borrow::ToOwned, vec::Vec};
 use bytemuck::{Pod, Zeroable};
 
-use crate::{arch::mm::tlb_flush, config::PAGE_SIZE, mm::frame_allocator};
+use crate::{arch::mm::tlb_flush, config::PAGE_SIZE, mm::option::VirtMemAllocOption};
 
 use super::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     frame::VirtMemFrame,
 };
 
-pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod + Zeroable {
+pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod + Zeroable + Debug {
     fn new() -> Self;
 
     fn set_valid(&mut self, valid: bool) -> Self;
@@ -38,7 +38,7 @@ pub(crate) trait PageTableFlagsTrait: Clone + Copy + Sized + Pod + Zeroable {
     fn is_dirty(&self) -> bool;
 }
 
-pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod + Zeroable {
+pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod + Zeroable + Debug {
     type F: PageTableFlagsTrait;
 
     fn page_index(addr: VirtAddr, level: usize) -> usize;
@@ -46,6 +46,8 @@ pub(crate) trait PageTableEntryTrait: Clone + Copy + Sized + Pod + Zeroable {
     fn phys_page_num(&self) -> PhysPageNum;
 
     fn flags(&self) -> Self::F;
+
+    fn is_used(&self) -> bool;
 
     fn update(&mut self, phys_page_num: PhysPageNum, flags: Self::F);
 
@@ -67,6 +69,7 @@ pub(crate) struct KernelMode;
 #[derive(Clone)]
 pub(crate) struct DeviceMode;
 
+#[derive(Debug)]
 pub(crate) struct PageTable<T: PageTableEntryTrait> {
     root_paddr: PhysAddr,
     tables: Vec<VirtMemFrame>,
@@ -74,10 +77,14 @@ pub(crate) struct PageTable<T: PageTableEntryTrait> {
 }
 
 impl<T: PageTableEntryTrait> PageTable<T> {
-    fn new(root_paddr: PhysAddr) -> Self {
+    pub fn new() -> Self {
+        let root_frame = VirtMemAllocOption::new(1).alloc_single().unwrap();
+
+        let tables = vec![root_frame.to_owned()];
+
         Self {
-            root_paddr,
-            tables: Vec::new(),
+            root_paddr: root_frame.start_phys_addr(),
+            tables,
             phantom: PhantomData,
         }
     }
@@ -85,10 +92,33 @@ impl<T: PageTableEntryTrait> PageTable<T> {
     fn page_walk(&mut self, addr: VirtAddr, create: bool) -> Option<&mut T> {
         let mut count = 3;
 
+        // println!("addr: {:x}", addr.0);
+
+        // (1..=3).rev().for_each(|i| {
+        //     println!("Fst page index {}: {:x}", i, T::page_index(addr, i));
+        // });
+
+        let vam = VirtPageNum::from(addr);
+
+        let mut vpn = vam.0;
+        let mut idx = [0usize; 3];
+        for i in (0..3).rev() {
+            idx[i] = vpn & 511;
+            vpn >>= 9;
+        }
+
+        // for i in (0..3).rev() {
+        //     println!("Snd page index {}: {:x}", i, idx[i]);
+        // }
+
         let mut current_entry = unsafe {
             &mut *((usize::from(self.root_paddr) + size_of::<T>() * T::page_index(addr, count))
                 as *mut T)
         };
+
+        //println!("entry  {:}", current_entry.is_used());
+
+        //println!("root_paddr: {:x}", self.root_paddr.0);
 
         while count > 1 {
             if !current_entry.flags().is_valid() {
@@ -96,7 +126,9 @@ impl<T: PageTableEntryTrait> PageTable<T> {
                     return None;
                 }
 
-                let frame = frame_allocator::alloc().unwrap();
+                let frame = VirtMemAllocOption::new(1).alloc_single().unwrap();
+
+                //println!("frame: {:x}", frame.start_phys_addr().0);
 
                 let flags = T::F::new()
                     .set_valid(true)
@@ -104,7 +136,8 @@ impl<T: PageTableEntryTrait> PageTable<T> {
                     .set_readable(true)
                     .set_writable(true);
                 current_entry.update(frame.start_phys_addr().into(), flags);
-                self.tables.push(frame);
+
+                self.tables.push(frame.to_owned());
             }
 
             // if current_entry.flags().is_huge() {
@@ -114,28 +147,41 @@ impl<T: PageTableEntryTrait> PageTable<T> {
             count -= 1;
             debug_assert!(size_of::<T>() * (T::page_index(addr, count) + 1) <= PAGE_SIZE);
 
+            //println!("entry{:x}", current_entry.phys_page_num().0);
+
+            //println!("entry  {:}", current_entry.is_used());
+
             current_entry = unsafe {
-                &mut *((usize::from(self.root_paddr) + size_of::<T>() * T::page_index(addr, count))
-                    as *mut T)
+                &mut *((usize::from(PhysAddr::from(current_entry.phys_page_num()))
+                    + size_of::<T>() * T::page_index(addr, count)) as *mut T)
             };
         }
+
         Some(current_entry)
     }
 
-    fn map(&mut self, addr: VirtAddr, target: PhysAddr, flags: T::F) -> Result<(), PageTableError> {
+    pub fn map(
+        &mut self,
+        addr: VirtAddr,
+        target: PhysAddr,
+        flags: T::F,
+    ) -> Result<(), PageTableError> {
         let entry = self
             .page_walk(addr, true)
             .ok_or(PageTableError::InvalidVaddr)?;
 
-        if entry.flags().is_valid() {
+        //println!("{:?}", entry.flags());
+
+        if entry.is_used() && entry.flags().is_valid() {
             return Err(PageTableError::InvalidModification);
         }
 
         entry.update(target.floor(), flags);
+        tlb_flush(addr);
         Ok(())
     }
 
-    fn unmap(&mut self, addr: VirtAddr) -> Result<(), PageTableError> {
+    pub fn unmap(&mut self, addr: VirtAddr) -> Result<(), PageTableError> {
         let entry = self
             .page_walk(addr, false)
             .ok_or(PageTableError::InvalidVaddr)?;
@@ -147,5 +193,21 @@ impl<T: PageTableEntryTrait> PageTable<T> {
         entry.clear();
         tlb_flush(addr);
         Ok(())
+    }
+
+    pub fn translate(&mut self, addr: VirtAddr) -> Result<T, PageTableError> {
+        let entry = self
+            .page_walk(addr, false)
+            .ok_or(PageTableError::InvalidVaddr)?;
+
+        if !entry.flags().is_valid() {
+            return Err(PageTableError::InvalidModification);
+        }
+
+        Ok(*entry)
+    }
+
+    pub fn get_root_paddr(&self) -> PhysAddr {
+        self.root_paddr
     }
 }

@@ -7,14 +7,18 @@
 #![feature(const_ptr_sub_ptr)]
 #![feature(trivial_bounds)]
 
+#[macro_use]
 extern crate alloc;
 
 use arch::power::shutdown;
+use log::info;
 
 mod arch;
 mod config;
 #[macro_use]
 mod console;
+pub mod error;
+mod logger;
 mod mm;
 mod panic;
 mod sync;
@@ -22,7 +26,8 @@ mod sync;
 #[no_mangle]
 extern "C" fn start_kernel() -> ! {
     clear_bss();
-    println!("[kernel] Hello, world!");
+    logger::init();
+    info!("[kernel] Hello, world!");
     mm::init();
     println!("[kernel] back to world!");
     shutdown(false)
