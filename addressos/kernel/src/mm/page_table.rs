@@ -80,11 +80,9 @@ impl<T: PageTableEntryTrait> PageTable<T> {
     pub fn new() -> Self {
         let root_frame = VirtMemAllocOption::new(1).alloc_single().unwrap();
 
-        let tables = vec![root_frame.to_owned()];
-
         Self {
             root_paddr: root_frame.start_phys_addr(),
-            tables,
+            tables: vec![root_frame],
             phantom: PhantomData,
         }
     }
@@ -92,33 +90,10 @@ impl<T: PageTableEntryTrait> PageTable<T> {
     fn page_walk(&mut self, addr: VirtAddr, create: bool) -> Option<&mut T> {
         let mut count = 3;
 
-        // println!("addr: {:x}", addr.0);
-
-        // (1..=3).rev().for_each(|i| {
-        //     println!("Fst page index {}: {:x}", i, T::page_index(addr, i));
-        // });
-
-        let vam = VirtPageNum::from(addr);
-
-        let mut vpn = vam.0;
-        let mut idx = [0usize; 3];
-        for i in (0..3).rev() {
-            idx[i] = vpn & 511;
-            vpn >>= 9;
-        }
-
-        // for i in (0..3).rev() {
-        //     println!("Snd page index {}: {:x}", i, idx[i]);
-        // }
-
         let mut current_entry = unsafe {
             &mut *((usize::from(self.root_paddr) + size_of::<T>() * T::page_index(addr, count))
                 as *mut T)
         };
-
-        //println!("entry  {:}", current_entry.is_used());
-
-        //println!("root_paddr: {:x}", self.root_paddr.0);
 
         while count > 1 {
             if !current_entry.flags().is_valid() {
@@ -128,16 +103,11 @@ impl<T: PageTableEntryTrait> PageTable<T> {
 
                 let frame = VirtMemAllocOption::new(1).alloc_single().unwrap();
 
-                //println!("frame: {:x}", frame.start_phys_addr().0);
+                let flags = T::F::new().set_valid(true);
 
-                let flags = T::F::new()
-                    .set_valid(true)
-                    .set_accessible_by_user(true)
-                    .set_readable(true)
-                    .set_writable(true);
                 current_entry.update(frame.start_phys_addr().into(), flags);
 
-                self.tables.push(frame.to_owned());
+                self.tables.push(frame);
             }
 
             // if current_entry.flags().is_huge() {
@@ -146,10 +116,6 @@ impl<T: PageTableEntryTrait> PageTable<T> {
 
             count -= 1;
             debug_assert!(size_of::<T>() * (T::page_index(addr, count) + 1) <= PAGE_SIZE);
-
-            //println!("entry{:x}", current_entry.phys_page_num().0);
-
-            //println!("entry  {:}", current_entry.is_used());
 
             current_entry = unsafe {
                 &mut *((usize::from(PhysAddr::from(current_entry.phys_page_num()))

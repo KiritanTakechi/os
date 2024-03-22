@@ -1,7 +1,7 @@
 KERNEL_NAME := addressos-kernel
 
 TARGET := riscv64gc-unknown-none-elf
-MODE := release
+MODE := debug
 BUILD_DIR := target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(BUILD_DIR)/$(KERNEL_NAME)
 
@@ -24,19 +24,25 @@ QEMU := qemu-system-riscv64
 QEMU_FLAGS := -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_ELF),addr=$(KERNEL_ENTRY_PA)
 
 # LLDB
-LLDB := lldb
+LLDB := rust-lldb
+
+ifeq ($(MODE), debug)
+	BUILD_CMD := @$(CARGO) build --target $(TARGET)
+else
+	BUILD_CMD := $(CARGO) build --target $(TARGET) --$(MODE)
+endif
 
 build:
 	# @$(SHELL) build_bin.sh
-	@$(CARGO) build --target $(TARGET) --$(MODE)
+	@$(BUILD_CMD)
 
 run: build
 	@$(QEMU) $(QEMU_FLAGS)
 
-gdbserver: build
+lldbserver: build
 	@$(QEMU) $(QEMU_FLAGS) -s -S
 
-gdbclient:
+lldbclient:
 	@$(LLDB) --file $(KERNEL_ELF) -o 'gdb-remote localhost:1234'
 
 clean:

@@ -104,7 +104,7 @@ pub fn mm_csr(root_addr:PhysAddr){
     let stap_bit = 8usize << 60 | root_addr.floor().0;
     unsafe {
         satp::write(stap_bit);
-        asm!("sfence.vma", options(nostack));
+        asm!("sfence.vma");
     }
 }
 

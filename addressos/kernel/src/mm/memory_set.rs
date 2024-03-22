@@ -3,15 +3,15 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+use log::info;
 use spin::{mutex::SpinMutex, once::Once};
 
 use crate::{
-    arch::mm::{PageTableEntry, PageTableFlags},
-    config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE},
+    arch::mm::{mm_csr, PageTableEntry, PageTableFlags},
+    config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE},
     error::Error,
     mm::{
-        is_page_aligned,
-        page_table::{PageTableEntryTrait, PageTableFlagsTrait},
+        address::VirtPageNum, is_page_aligned, page_table::{PageTableEntryTrait, PageTableFlagsTrait}
     },
 };
 
@@ -80,7 +80,7 @@ impl MapArea {
         self.size
     }
 
-    pub fn new(
+    pub fn new_with_frames(
         start_va: VirtAddr,
         size: usize,
         flags: PageTableFlags,
@@ -93,7 +93,11 @@ impl MapArea {
                 && physical_frames.len() == (size / PAGE_SIZE)
         );
 
-        println!("mapping from {:#x?} to {:#x?}", start_va.0, start_va.0 + size);
+        println!(
+            "mapping from {:#x?} to {:#x?}",
+            start_va.0,
+            start_va.0 + size
+        );
 
         let mut map_area = Self {
             flags,
@@ -113,6 +117,24 @@ impl MapArea {
         }
 
         map_area
+    }
+
+    pub fn new(start_va: VirtAddr, size: usize, flags: PageTableFlags, map_type: MapType) -> Self {
+        assert!(is_page_aligned(start_va.into()) && is_page_aligned(size));
+
+        println!(
+            "mapping from {:#x?} to {:#x?}",
+            start_va.0,
+            start_va.0 + size
+        );
+
+        Self {
+            flags,
+            start_va,
+            size,
+            map_type,
+            mapper: BTreeMap::new(),
+        }
     }
 
     pub fn map_with_physical_address(&mut self, va: VirtAddr, pa: VirtMemFrame) -> PhysAddr {
@@ -180,6 +202,19 @@ impl MemorySet {
         }
     }
 
+    fn map_trampoline(&mut self) {
+        self.pt
+            .map(
+                VirtAddr::from(TRAMPOLINE),
+                PhysAddr::from(strampoline as usize),
+                PageTableFlags::new()
+                    .set_valid(true)
+                    .set_readable(true)
+                    .set_executable(true),
+            )
+            .unwrap()
+    }
+
     pub fn new_kernel() -> Self {
         let mut memory_set: MemorySet = Self::new();
 
@@ -195,10 +230,7 @@ impl MemorySet {
             .set_readable(true)
             .set_writable(true);
 
-        memory_set
-            .pt
-            .map(VirtAddr(TRAMPOLINE), PhysAddr(strampoline as usize), rxflag)
-            .unwrap();
+        memory_set.map_trampoline();
 
         println!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
         println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
@@ -214,9 +246,6 @@ impl MemorySet {
             etext as usize - stext as usize,
             rxflag,
             MapType::Identical,
-            VirtMemAllocOption::new((etext as usize - stext as usize) / PAGE_SIZE)
-                .alloc()
-                .unwrap(),
         );
 
         println!(
@@ -233,9 +262,6 @@ impl MemorySet {
             erodata as usize - srodata as usize,
             rflag,
             MapType::Identical,
-            VirtMemAllocOption::new((erodata as usize - srodata as usize) / PAGE_SIZE)
-                .alloc()
-                .unwrap(),
         );
 
         println!(
@@ -252,9 +278,6 @@ impl MemorySet {
             edata as usize - sdata as usize,
             rwflag,
             MapType::Identical,
-            VirtMemAllocOption::new((edata as usize - sdata as usize) / PAGE_SIZE)
-                .alloc()
-                .unwrap(),
         );
 
         println!(
@@ -271,9 +294,6 @@ impl MemorySet {
             ebss as usize - sbss_with_stack as usize,
             rwflag,
             MapType::Identical,
-            VirtMemAllocOption::new((ebss as usize - sbss_with_stack as usize) / PAGE_SIZE)
-                .alloc()
-                .unwrap(),
         );
 
         println!(
@@ -290,9 +310,6 @@ impl MemorySet {
             MEMORY_END - ekernel as usize,
             rwflag,
             MapType::Identical,
-            VirtMemAllocOption::new((MEMORY_END - ekernel as usize) / PAGE_SIZE)
-                .alloc()
-                .unwrap(),
         );
 
         println!(
@@ -304,43 +321,121 @@ impl MemorySet {
 
         println!("mapping memory-mapped registers");
 
-        for (start, end) in MMIO.iter() {
-            let mmio_area = MapArea::new(
-                VirtAddr(*start),
-                *end - *start,
-                rwflag,
-                MapType::Identical,
-                VirtMemAllocOption::new((*end - *start) / PAGE_SIZE)
-                    .alloc()
-                    .unwrap(),
-            );
+        for (start, size) in MMIO.iter() {
+            let mmio_area =
+                MapArea::new(VirtAddr(*start), *size, rwflag, MapType::Identical);
 
             memory_set.map(mmio_area);
         }
 
-        println!("kernel space initialized");
-
         memory_set
     }
 
-    pub fn new_elf() -> Self {
-        todo!()
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+        let mut memory_set = Self::new();
+        // map trampoline
+        memory_set.map_trampoline();
+        // map program headers of elf, with U flag
+        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        let elf_header = elf.header;
+        let magic = elf_header.pt1.magic;
+        assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
+        let ph_count = elf_header.pt2.ph_count();
+        let mut max_end_vpn = VirtPageNum(0);
+
+        for i in 0..ph_count {
+            let ph = elf.program_header(i).unwrap();
+            if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+                let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
+                let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
+                let mut flag = PageTableFlags::new().set_accessible_by_user(true);
+                let ph_flags = ph.flags();
+                if ph_flags.is_read() {
+                    flag.set_readable(true);
+                }
+                if ph_flags.is_write() {
+                    flag.set_writable(true);
+                }
+                if ph_flags.is_execute() {
+                    flag.set_executable(true);
+                }
+
+                let map_area = MapArea::new(
+                    start_va,
+                    usize::from(end_va) - usize::from(start_va),
+                    flag,
+                    MapType::Framed,
+                );
+
+                max_end_vpn = end_va.ceil();
+
+                memory_set.map(map_area);
+
+                memory_set.write_bytes(start_va.into(), &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]).unwrap();
+            }
+        }
+        // map user stack with U flags
+        let max_end_va: VirtAddr = max_end_vpn.into();
+        let mut user_stack_bottom: usize = max_end_va.into();
+        // guard page
+        user_stack_bottom += PAGE_SIZE;
+        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+
+        let user_stack_area = MapArea::new(
+            user_stack_bottom.into(),
+            user_stack_top- user_stack_bottom,
+            PageTableFlags::new().set_accessible_by_user(true).set_readable(true).set_writable(true),
+            MapType::Framed,
+        );
+
+        memory_set.map(user_stack_area);
+
+        let trampoline_area = MapArea::new(
+            TRAP_CONTEXT.into(),
+            TRAMPOLINE - TRAP_CONTEXT,
+            PageTableFlags::new().set_readable(true).set_writable(true),
+            MapType::Framed,
+        );
+
+        memory_set.map(trampoline_area);
+
+        (
+            memory_set,
+            user_stack_top,
+            elf.header.pt2.entry_point() as usize,
+        )
     }
 
     pub fn map(&mut self, area: MapArea) {
-        if area.size > 0 {
-            if let Entry::Vacant(e) = self.areas.entry(area.start_va) {
-                let area = e.insert(area);
-                for (va, frame) in area.mapper.iter() {
-                    self.pt
-                        .map(*va, frame.start_phys_addr(), area.flags)
-                        .unwrap();
+        match area.map_type {
+            MapType::Identical => {
+                if area.size > 0 {
+                    (area.start_va.0..area.start_va.0 + area.size)
+                        .step_by(PAGE_SIZE)
+                        .for_each(|va| {
+                            //info!("mapping {:#x?}", va);
+                            self.pt
+                                .map(VirtAddr::from(va), PhysAddr::from(va), area.flags)
+                                .unwrap();
+                        });
                 }
-            } else {
-                panic!(
-                    "MemorySet::map: MapArea starts from {:#x?} is existed!",
-                    area.start_va
-                );
+            }
+            MapType::Framed => {
+                if area.size > 0 {
+                    if let Entry::Vacant(e) = self.areas.entry(area.start_va) {
+                        let area = e.insert(area);
+                        for (va, frame) in area.mapper.iter() {
+                            self.pt
+                                .map(*va, frame.start_phys_addr(), area.flags)
+                                .unwrap();
+                        }
+                    } else {
+                        panic!(
+                            "MemorySet::map: MapArea starts from {:#x?} is existed!",
+                            area.start_va
+                        );
+                    }
+                }
             }
         }
     }
@@ -427,10 +522,38 @@ impl MemorySet {
     }
 }
 
+impl Clone for MemorySet {
+    fn clone(&self) -> Self {
+        let mut ms = Self::new();
+        for area in self.areas.values() {
+            ms.map(area.clone());
+        }
+        ms
+    }
+}
+impl Drop for MemorySet {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
 pub fn init() {
     KERNEL_SPACE.call_once(|| Arc::new(SpinMutex::new(MemorySet::new_kernel())));
-    let addr = KERNEL_SPACE.get().unwrap().lock().pt.get_root_paddr();
-    //mm_csr(addr);
+    let table = &mut KERNEL_SPACE.get().unwrap().lock().pt;
+
+    let tmp = table.translate(VirtAddr(0x80202000)).unwrap();
+
+    println!("entry::{:x}", tmp.phys_page_num().0 << 12);
+
+    let addr = table.get_root_paddr();
+
+    println!("kernel space initialing");
+
+    info!("root_addr:0x{:x?}", addr.0);
+
+    mm_csr(addr);
+
+    println!("kernel space initialized");
 }
 
 #[allow(unused)]

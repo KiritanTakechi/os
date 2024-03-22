@@ -13,3 +13,4 @@ once_cell = { workspace = true }
 spin = { workspace = true }
 bytemuck = { workspace = true }
 riscv = { workspace = true }
+xmas-elf = { workspace = true }
