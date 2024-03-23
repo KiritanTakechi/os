@@ -19,7 +19,7 @@ impl Init {
     pub(crate) fn init_app_cx(app_id: usize) -> usize {
         unsafe { set_spp(SPP::User) };
         let mut cx = TrapContext::new();
-        let sp_ptr = USER_STACK[app_id].top_ptr() as usize;
+        let sp_ptr = USER_STACK[app_id].top_ptr();
         let sepc_ptr = get_base_i(app_id);
         cx.set_sp(sp_ptr);
         cx.set_sepc(sepc_ptr);

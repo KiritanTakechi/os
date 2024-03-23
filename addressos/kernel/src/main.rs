@@ -22,6 +22,9 @@ mod logger;
 mod mm;
 mod panic;
 mod sync;
+pub mod trap;
+pub mod task;
+pub mod ffi;
 
 #[no_mangle]
 extern "C" fn start_kernel() -> ! {

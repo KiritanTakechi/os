@@ -4,7 +4,7 @@ pub(crate) mod address;
 mod frame;
 mod frame_allocator;
 mod heap_allocator;
-mod memory_set;
+pub mod memory_set;
 mod option;
 pub(crate) mod page_table;
 
