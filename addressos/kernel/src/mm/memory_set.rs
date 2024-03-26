@@ -1,9 +1,10 @@
 use alloc::{
+    borrow::ToOwned,
     collections::{btree_map::Entry, BTreeMap},
     sync::Arc,
     vec::Vec,
 };
-use log::info;
+use log::{info, warn};
 use spin::{mutex::SpinMutex, once::Once};
 
 use crate::{
@@ -11,7 +12,9 @@ use crate::{
     config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE},
     error::Error,
     mm::{
-        address::VirtPageNum, is_page_aligned, page_table::{PageTableEntryTrait, PageTableFlagsTrait}
+        address::VirtPageNum,
+        is_page_aligned,
+        page_table::{PageTableEntryTrait, PageTableFlagsTrait},
     },
 };
 
@@ -164,6 +167,7 @@ impl MapArea {
     pub fn write_data(&mut self, addr: usize, data: &[u8]) {
         let mut current_start_address = addr;
         let mut buf_reader: VirtMemReader = data.into();
+        info!("write_data: addr: {:#x?}", addr);
         for (va, pa) in self.mapper.iter() {
             if current_start_address >= va.0 && current_start_address < va.0 + PAGE_SIZE {
                 let offset = current_start_address - va.0;
@@ -218,17 +222,22 @@ impl MemorySet {
     pub fn new_kernel() -> Self {
         let mut memory_set: MemorySet = Self::new();
 
-        let rflag = PageTableFlags::new().set_valid(true).set_readable(true);
+        let rflag = PageTableFlags::new()
+            .set_valid(true)
+            .set_readable(true)
+            .set_valid(true);
 
         let rxflag = PageTableFlags::new()
             .set_valid(true)
             .set_readable(true)
-            .set_executable(true);
+            .set_executable(true)
+            .set_valid(true);
 
         let rwflag = PageTableFlags::new()
             .set_valid(true)
             .set_readable(true)
-            .set_writable(true);
+            .set_writable(true)
+            .set_valid(true);
 
         memory_set.map_trampoline();
 
@@ -322,8 +331,7 @@ impl MemorySet {
         println!("mapping memory-mapped registers");
 
         for (start, size) in MMIO.iter() {
-            let mmio_area =
-                MapArea::new(VirtAddr(*start), *size, rwflag, MapType::Identical);
+            let mmio_area = MapArea::new(VirtAddr(*start), *size, rwflag, MapType::Identical);
 
             memory_set.map(mmio_area);
         }
@@ -348,7 +356,9 @@ impl MemorySet {
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
                 let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
                 let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
-                let mut flag = PageTableFlags::new().set_accessible_by_user(true);
+                let mut flag = PageTableFlags::new()
+                    .set_accessible_by_user(true)
+                    .set_valid(true);
                 let ph_flags = ph.flags();
                 if ph_flags.is_read() {
                     flag.set_readable(true);
@@ -371,7 +381,12 @@ impl MemorySet {
 
                 memory_set.map(map_area);
 
-                memory_set.write_bytes(start_va.into(), &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]).unwrap();
+                memory_set
+                    .write_bytes(
+                        start_va.into(),
+                        &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
+                    )
+                    .unwrap();
             }
         }
         // map user stack with U flags
@@ -383,8 +398,12 @@ impl MemorySet {
 
         let user_stack_area = MapArea::new(
             user_stack_bottom.into(),
-            user_stack_top- user_stack_bottom,
-            PageTableFlags::new().set_accessible_by_user(true).set_readable(true).set_writable(true),
+            user_stack_top - user_stack_bottom,
+            PageTableFlags::new()
+                .set_accessible_by_user(true)
+                .set_readable(true)
+                .set_writable(true)
+                .set_valid(true),
             MapType::Framed,
         );
 
@@ -393,7 +412,10 @@ impl MemorySet {
         let trampoline_area = MapArea::new(
             TRAP_CONTEXT.into(),
             TRAMPOLINE - TRAP_CONTEXT,
-            PageTableFlags::new().set_readable(true).set_writable(true),
+            PageTableFlags::new()
+                .set_readable(true)
+                .set_writable(true)
+                .set_valid(true),
             MapType::Framed,
         );
 
@@ -581,4 +603,33 @@ pub fn remap_test() {
         .flags()
         .is_executable(),);
     println!("remap_test passed!");
+}
+
+#[allow(unused)]
+pub fn write_test() {
+    let mut set = MemorySet::new();
+    let data = [1u8, 2, 3, 4, 5];
+    let va = VirtAddr(0x100000000);
+    let mut area = MapArea::new_with_frames(
+        va,
+        32 * PAGE_SIZE,
+        PageTableFlags::new()
+            .set_readable(true)
+            .set_writable(true)
+            .set_valid(true),
+        MapType::Framed,
+        VirtMemAllocOption::new(32).alloc().unwrap(),
+    );
+
+    set.map(area.to_owned());
+
+    info!("{:?}", set.areas.len());
+
+    set.write_bytes(va.into(), &data);
+
+    let mut buf = [0u8; 5];
+
+    set.read_bytes(va.into(), &mut buf);
+
+    assert_eq!(data, buf);
 }

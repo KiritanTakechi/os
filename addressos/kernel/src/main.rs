@@ -25,6 +25,7 @@ mod sync;
 pub mod trap;
 pub mod task;
 pub mod ffi;
+pub mod timer;
 
 #[no_mangle]
 extern "C" fn start_kernel() -> ! {

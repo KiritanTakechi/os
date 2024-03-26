@@ -2,6 +2,7 @@ use core::{fmt::Debug, marker::PhantomData, mem::size_of};
 
 use alloc::{borrow::ToOwned, vec::Vec};
 use bytemuck::{Pod, Zeroable};
+use log::info;
 
 use crate::{arch::mm::tlb_flush, config::PAGE_SIZE, mm::option::VirtMemAllocOption};
 

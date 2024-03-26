@@ -16,6 +16,7 @@ pub fn init() {
     //option::frame_allocator_test();
     memory_set::init();
     //memory_set::remap_test();
+    //memory_set::write_test();
 }
 
 pub const fn is_page_aligned(p: usize) -> bool {
