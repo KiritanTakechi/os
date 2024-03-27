@@ -61,7 +61,9 @@ impl TaskControlBlock {
                 .unwrap(),
         );
 
-        KERNEL_SPACE.get_mut().unwrap().lock().map(stack_area);
+        let kernel_space = KERNEL_SPACE.get().unwrap();
+
+        kernel_space.lock().map(stack_area);
 
         let task_control_block = Self {
             task_status,
@@ -74,15 +76,7 @@ impl TaskControlBlock {
         };
         // // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
-        let satp = 8usize << 60
-            | KERNEL_SPACE
-                .get()
-                .unwrap()
-                .lock()
-                .pt
-                .get_root_paddr()
-                .floor()
-                .0;
+        let satp = 8usize << 60 | kernel_space.lock().pt.get_root_paddr().floor().0;
         *trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,
