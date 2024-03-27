@@ -5,7 +5,7 @@ mod frame;
 mod frame_allocator;
 mod heap_allocator;
 pub mod memory_set;
-mod option;
+pub mod option;
 pub(crate) mod page_table;
 
 pub fn init() {

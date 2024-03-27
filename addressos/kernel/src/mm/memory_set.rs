@@ -370,11 +370,16 @@ impl MemorySet {
                     flag.set_executable(true);
                 }
 
-                let map_area = MapArea::new(
+                let map_area = MapArea::new_with_frames(
                     start_va,
                     usize::from(end_va) - usize::from(start_va),
                     flag,
                     MapType::Framed,
+                    VirtMemAllocOption::new(
+                        (usize::from(end_va) - usize::from(start_va)) / PAGE_SIZE,
+                    )
+                    .alloc()
+                    .unwrap(),
                 );
 
                 max_end_vpn = end_va.ceil();
@@ -396,7 +401,7 @@ impl MemorySet {
         user_stack_bottom += PAGE_SIZE;
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
 
-        let user_stack_area = MapArea::new(
+        let user_stack_area = MapArea::new_with_frames(
             user_stack_bottom.into(),
             user_stack_top - user_stack_bottom,
             PageTableFlags::new()
@@ -405,11 +410,14 @@ impl MemorySet {
                 .set_writable(true)
                 .set_valid(true),
             MapType::Framed,
+            VirtMemAllocOption::new((user_stack_top - user_stack_bottom) / PAGE_SIZE)
+                .alloc()
+                .unwrap(),
         );
 
         memory_set.map(user_stack_area);
 
-        let trampoline_area = MapArea::new(
+        let trampoline_area = MapArea::new_with_frames(
             TRAP_CONTEXT.into(),
             TRAMPOLINE - TRAP_CONTEXT,
             PageTableFlags::new()
@@ -417,6 +425,9 @@ impl MemorySet {
                 .set_writable(true)
                 .set_valid(true),
             MapType::Framed,
+            VirtMemAllocOption::new((TRAMPOLINE - TRAP_CONTEXT) / PAGE_SIZE)
+                .alloc()
+                .unwrap(),
         );
 
         memory_set.map(trampoline_area);
@@ -542,6 +553,11 @@ impl MemorySet {
         }
         Err(Error::PageFault)
     }
+
+    pub fn token(&self) -> usize {
+        self.pt.get_root_paddr().0
+    }
+
 }
 
 impl Clone for MemorySet {
@@ -563,9 +579,9 @@ pub fn init() {
     KERNEL_SPACE.call_once(|| Arc::new(SpinMutex::new(MemorySet::new_kernel())));
     let table = &mut KERNEL_SPACE.get().unwrap().lock().pt;
 
-    let tmp = table.translate(VirtAddr(0x80202000)).unwrap();
+    //let tmp = table.translate(VirtAddr(0x80202000)).unwrap();
 
-    println!("entry::{:x}", tmp.phys_page_num().0 << 12);
+    //println!("entry::{:x}", tmp.phys_page_num().0 << 12);
 
     let addr = table.get_root_paddr();
 

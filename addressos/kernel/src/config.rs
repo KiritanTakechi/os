@@ -32,3 +32,9 @@ pub const MEMORY_END: usize = 0x8800_0000;
 pub const MMIO: &[(usize, usize)] = &[(0x0010_0000, 0x00_2000)];
 
 pub const LOGGER: Logger = Logger;
+
+pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {
+    let top = TRAMPOLINE - app_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    let bottom = top - KERNEL_STACK_SIZE;
+    (bottom, top)
+}
