@@ -29,8 +29,8 @@ pub fn init(num_app: usize) {
 
     let mut tasks: Vec<TaskControlBlock> = Vec::new();
         for i in 0..num_app {
-            todo!()
-            //tasks.push(TaskControlBlock::new(get_app_data(i), i));
+            //todo!()
+            tasks.push(TaskControlBlock::new(get_app_data(i), i));
         }
         let man =  TaskManager {
             num_app,
@@ -45,4 +45,8 @@ pub fn init(num_app: usize) {
     TASK_MANAGER.call_once(|| {
         man
     });
+}
+
+impl TaskManager {
+    
 }

@@ -33,11 +33,10 @@ impl TaskControlBlock {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
     }
-    // pub fn get_user_token(&self) -> usize {
-    //     self.memory_set.token()
-    // }
+    pub fn get_user_token(&self) -> usize {
+        self.memory_set.token()
+    }
     pub fn new(elf_data: &[u8], app_id: usize) -> Self {
-        // memory_set with elf program headers/trampoline/trap context/user stack
         let (mut memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
         let trap_cx_ppn = memory_set
             .pt
