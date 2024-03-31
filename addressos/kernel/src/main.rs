@@ -18,15 +18,16 @@ mod config;
 #[macro_use]
 mod console;
 pub mod error;
+pub mod ffi;
+pub mod loader;
 mod logger;
 mod mm;
 mod panic;
 mod sync;
-pub mod trap;
 pub mod task;
-pub mod ffi;
 pub mod timer;
-pub mod loader;
+pub mod trap;
+pub mod syscall;
 
 #[no_mangle]
 extern "C" fn start_kernel() -> ! {

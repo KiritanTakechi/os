@@ -88,6 +88,14 @@ impl<T: PageTableEntryTrait> PageTable<T> {
         }
     }
 
+    pub fn from_token(satp: usize) -> Self {
+        Self {
+            root_paddr: PhysAddr::from(satp * PAGE_SIZE),
+            tables: Vec::new(),
+            phantom: PhantomData,
+        }
+    }
+
     fn page_walk(&mut self, addr: VirtAddr, create: bool) -> Option<&mut T> {
         let mut count = 3;
 
