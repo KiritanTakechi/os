@@ -1,0 +1,15 @@
+[package]
+name = "processos-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sbi-rt = { workspace = true, features = ["legacy"] }
+bitflags = { workspace = true }
+spin = { workspace = true }
+bytemuck = { workspace = true }
+riscv = { workspace = true }
+log = { workspace = true }
+
+[build_dependencies]
+dotenvy = { workspace = true }

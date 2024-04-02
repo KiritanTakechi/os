@@ -1,0 +1,13 @@
+{
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "rust-analyzer.checkOnSave.extraArgs": [
+        "--target",
+        "riscv64gc-unknown-none-elf"
+    ],
+    "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+    "rust-analyzer.linkedProjects": [
+        "./kernel/Cargo.toml",
+        "./user/Cargo.toml",
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
+}
