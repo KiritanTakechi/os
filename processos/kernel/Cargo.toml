@@ -10,6 +10,8 @@ spin = { workspace = true }
 bytemuck = { workspace = true }
 riscv = { workspace = true }
 log = { workspace = true }
+pid-allocator = { workspace = true }
+buddy_system_allocator = { workspace = true }
 
 [build_dependencies]
 dotenvy = { workspace = true }

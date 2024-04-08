@@ -1,8 +1,7 @@
 [build]
 target = "riscv64gc-unknown-none-elf"
+rustflags = ["-Z", "threads=20"]
 
 [target.riscv64gc-unknown-none-elf]
 runner = "qemu-system-riscv64"
-rustflags = [
-    "-Cforce-frame-pointers=yes",
-]
+rustflags = ["-Cforce-frame-pointers=yes"]

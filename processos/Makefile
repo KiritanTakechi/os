@@ -1,3 +1,6 @@
+include .env
+export
+
 KERNEL_NAME := processos-kernel
 
 TARGET := riscv64gc-unknown-none-elf

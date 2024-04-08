@@ -10,8 +10,8 @@
 use arch::power::shutdown;
 use ffi::{ebss, sbss};
 
-// #[macro_use]
-// extern crate alloc;
+#[macro_use]
+extern crate alloc;
 
 #[macro_use]
 pub(crate) mod console;
@@ -19,12 +19,14 @@ pub(crate) mod arch;
 pub(crate) mod config;
 pub(crate) mod ffi;
 pub(crate) mod logger;
+pub(crate) mod mm;
 pub(crate) mod panic;
 
 #[no_mangle]
 extern "C" fn start_kernel() -> ! {
     clear_bss();
     logger::init();
+    mm::init();
     shutdown(false);
 }
 
