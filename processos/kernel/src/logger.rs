@@ -1,48 +1,58 @@
-use log::{Level, Log, Record};
+use log::{Level, LevelFilter, Log, Metadata, Record};
+use spin::Once;
 
-use crate::config::LOGGER;
+static LOGGER: Once<Logger> = Once::new();
 
-pub struct Logger;
+pub struct Logger {
+    pub color_enabled: bool,
+}
+
+impl Logger {
+    fn level_to_color_code(&self, level: Level) -> &'static str {
+        if self.color_enabled {
+            match level {
+                Level::Error => "31",
+                Level::Warn => "33",
+                Level::Info => "32",
+                Level::Debug => "34",
+                Level::Trace => "35",
+            }
+        } else {
+            ""
+        }
+    }
+}
 
 impl Log for Logger {
-    fn enabled(&self, _metadata: &log::Metadata) -> bool {
-        true
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= Level::Trace
     }
 
     fn log(&self, record: &Record) {
-        let level2color = |level: Level| match level {
-            Level::Error => "31",
-            Level::Warn => "33",
-            Level::Info => "32",
-            Level::Debug => "34",
-            Level::Trace => "35",
-        };
-
-        (self.enabled(record.metadata())).then(|| {
-            let color = level2color(record.level());
-
+        if self.enabled(record.metadata()) {
+            let color_code = self.level_to_color_code(record.level());
             println!(
-                "\u{1B}[{}m[{:^5}] {}\u{1B}[0m",
-                color,
+                "\u{1B}[{}m[{:^7}] {}\u{1B}[0m",
+                color_code,
                 record.level(),
                 record.args(),
             );
-        });
+        }
     }
 
     fn flush(&self) {}
 }
 
-pub fn init() {
-    let env2level = || match option_env!("LOG").unwrap_or("TRACE") {
-        "TRACE" => log::LevelFilter::Trace,
-        "DEBUG" => log::LevelFilter::Debug,
-        "INFO" => log::LevelFilter::Info,
-        "WARN" => log::LevelFilter::Warn,
-        "ERROR" => log::LevelFilter::Error,
-        _ => log::LevelFilter::Info,
-    };
+pub fn init(color_enabled: bool) -> Result<(), log::SetLoggerError> {
+    LOGGER.call_once(|| Logger { color_enabled });
 
-    log::set_logger(&LOGGER).unwrap();
-    log::set_max_level(env2level());
+    let logger = LOGGER.get().unwrap();
+
+    log::set_logger(logger)?;
+
+    let default_level = option_env!("LOG").unwrap_or("TRACE");
+    let level_filter = default_level.parse().unwrap_or(LevelFilter::Trace);
+    log::set_max_level(level_filter);
+
+    Ok(())
 }

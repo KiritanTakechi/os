@@ -9,6 +9,7 @@ mod space;
 
 pub(super) fn init() {
     heap_allocator::init_heap();
+    frame_allocator::init_frame_allocator();
 
     tests::test();
 }

@@ -22,6 +22,9 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 # Rust
 CARGO := cargo
 
+# Build
+BUILD := build
+
 # QEMU
 QEMU := qemu-system-riscv64
 QEMU_FLAGS := -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_ELF),addr=$(KERNEL_ENTRY_PA)
@@ -30,9 +33,9 @@ QEMU_FLAGS := -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$
 LLDB := rust-lldb
 
 ifeq ($(MODE), debug)
-	BUILD_CMD := @$(CARGO) build --target $(TARGET)
+	BUILD_CMD := @$(CARGO) $(BUILD) --target $(TARGET)
 else
-	BUILD_CMD := $(CARGO) build --target $(TARGET) --$(MODE)
+	BUILD_CMD := $(CARGO) $(BUILD) --target $(TARGET) --$(MODE)
 endif
 
 build:

@@ -4,7 +4,6 @@ use super::{address::PhysPageNum, frame::VirtMemFrame};
 
 use alloc::vec::Vec;
 use buddy_system_allocator::LockedFrameAllocator;
-use lazy_static::*;
 use spin::Once;
 
 pub(super) static FRAME_ALLOCATOR: Once<LockedFrameAllocator> = Once::new();

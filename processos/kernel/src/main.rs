@@ -8,10 +8,12 @@
 #![feature(trivial_bounds)]
 
 use arch::power::shutdown;
-use ffi::{ebss, sbss};
+use utils::clear_bss;
 
 #[macro_use]
 extern crate alloc;
+#[macro_use]
+extern crate log;
 
 #[macro_use]
 pub(crate) mod console;
@@ -21,18 +23,12 @@ pub(crate) mod ffi;
 pub(crate) mod logger;
 pub(crate) mod mm;
 pub(crate) mod panic;
+pub(crate) mod utils;
 
 #[no_mangle]
 extern "C" fn start_kernel() -> ! {
     clear_bss();
-    logger::init();
+    logger::init(true).unwrap();
     mm::init();
     shutdown(false);
-}
-
-fn clear_bss() {
-    unsafe {
-        core::slice::from_raw_parts_mut(sbss as usize as *mut u8, ebss as usize - sbss as usize)
-            .fill(0);
-    }
 }

@@ -12,6 +12,7 @@ riscv = { workspace = true }
 log = { workspace = true }
 pid-allocator = { workspace = true }
 buddy_system_allocator = { workspace = true }
+snafu = { workspace = true }
 
 [build_dependencies]
 dotenvy = { workspace = true }
